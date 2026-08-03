@@ -1,0 +1,47 @@
+# ~/.tmux.conf.local — oh-my-tmux(gpakosz/.tmux) 사용자 오버라이드.
+# 메인 ~/.tmux.conf 마지막에서 `source -q ~/.tmux.conf.local` 로 자동 로드된다.
+# 여기에 없는 설정(테마·status·기존 키 바인딩)은 전부 메인 .tmux.conf 기본값을 그대로 따른다.
+
+# ── 마우스 ───────────────────────────────────────────────────────
+# pane 클릭 전환/리사이즈, 휠 스크롤. 서버 재시작 후에도 유지되도록 여기서 켠다.
+set -g mouse on
+
+# ── 세션 사이드바 ────────────────────────────────────────────────
+# tmux 세션/창을 좌측에 항상 보이는 패널로 띄운다. 기존 키는 건드리지 않고
+# prefix+S 토글만 추가. 실제 전환은 기존 단축키(prefix BTab / C-f / s) 그대로.
+
+set -g @sidebar_on 0            # 시작 시 꺼짐
+# set -g @sidebar_width 26      # 패널 폭(칸)
+# set -g @sidebar_min_width 60  # 이보다 좁은 창엔 생략
+# set -g @sidebar_follow on     # 보는 창마다 따라다님 (off=토글한 창에만)
+# set -g @sidebar_refresh 2     # 갱신 주기(초)
+
+# prefix + S : 사이드바 토글
+bind S run-shell -b "~/development/tmux-config/scripts/session-sidebar.sh toggle"
+
+# 자동 follow: 세션/창을 옮겨도 현재 보는 창에 사이드바를 유지 (-ga = 기존 훅 보존하며 추가)
+set-hook -ga client-session-changed 'run-shell -b "~/development/tmux-config/scripts/session-sidebar.sh ensure-here"'
+set-hook -ga after-select-window     'run-shell -b "~/development/tmux-config/scripts/session-sidebar.sh ensure"'
+set-hook -ga after-new-window        'run-shell -b "~/development/tmux-config/scripts/session-sidebar.sh ensure"'
+
+# ── 입력 언어 표시 ───────────────────────────────────────────────
+# 현재 macOS 입력 소스(한/EN/あ/中)를 pane 아래 경로 표시줄 앞쪽에 표시한다.
+# start 가 run-shell -b(비동기)로 실행되어 메인 .tmux.conf 의 pane-border-format
+# 재설정 이후에 @input_lang 인디케이터를 붙이고, watcher 가 변화를 감지해
+# @input_lang 옵션을 갱신 + refresh-client 로 경계까지 즉시 다시 그린다.
+# 전역 status-interval(배터리 등 폴링 주기)은 건드리지 않는다.
+# (im-select 필요: `brew install im-select`)
+run-shell -b "~/development/tmux-config/scripts/input-lang.sh start"
+
+# ── Claude Code 세션 상태 배지 ───────────────────────────────────
+# 각 창에서 돌고 있는 Claude Code 세션의 상태를 창 탭의 윈도우 이름 오른쪽에 1글자로 표시한다.
+#   ● 주황=응답/툴 실행중, ▲ 빨강=내 입력·권한 대기, $ 파랑=셸 실행중, · 회색=한가함
+# ~/.claude/sessions/<pid>.json(Claude 가 상태 전이마다 갱신)을 1초 주기로 읽어
+# pid→pane_pid→윈도우로 매핑하고 @cc_status 옵션에 반영한다. window-status-format
+# 주입은 스크립트가 idempotent 하게 처리하므로, 메인 .tmux.conf 가 매 로드마다
+# 테마를 재생성해도 watcher 가 다시 붙인다. 끄려면 `claude-status.sh stop`.
+run-shell -b "~/development/tmux-config/scripts/claude-status.sh start"
+
+# pane 비활성 구분선 색만 회색으로 고정(테마 기본값 오버라이드).
+# 활성 구분선 색은 input-lang.sh watcher 가 "현재 입력 언어"에 맞춰 동적으로 설정한다.
+setw -g pane-border-style "fg=colour242" #!important
